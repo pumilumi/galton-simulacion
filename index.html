@@ -119,6 +119,7 @@
     <button role="tab" data-tab="mue"><span class="n">03</span>El muestreo</button>
     <button role="tab" data-tab="reg"><span class="n">04</span>La regresión</button>
     <button role="tab" data-tab="multi"><span class="n">05</span>Dos variables</button>
+    <button role="tab" data-tab="ci"><span class="n">06</span>El intervalo</button>
   </nav>
 
   <!-- 01 PLACA -->
@@ -322,6 +323,49 @@
     </div>
   </section>
 
+  <!-- 06 EL INTERVALO -->
+  <section class="panel" id="ci">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2>El intervalo y la Normal</h2>
+          <p class="note">El estimador β̂₁ se distribuye <b>Normal</b> alrededor de su valor, y el ancho de
+            esa Normal es el <b>error estándar</b> (ee). El intervalo de confianza es, sencillamente, tomar
+            esa Normal y quedarse con su parte central: <b>β̂₁ ± t·ee</b>. Cambia el nivel y observa cómo
+            varían el multiplicador <b>t</b> y el ancho.</p>
+          <div class="eqbox" id="ciFormula">IC = β̂₁ ± t · ee(β̂₁)</div>
+          <label class="ctl">Tamaño de muestra n <span class="val" id="cinVal">40</span>
+            <input type="range" id="cin" min="10" max="200" step="5" value="40"></label>
+          <h3>Nivel de confianza</h3>
+          <div class="seg" id="ciLevelSeg">
+            <button data-lvl="90">90%</button>
+            <button data-lvl="95" aria-pressed="true">95%</button>
+            <button data-lvl="99">99%</button>
+          </div>
+          <div class="btnrow"><button class="act" id="ciNew">Nueva muestra</button></div>
+          <div class="stats">
+            <div class="stat hi"><p class="lab">Media β̂₁</p><div class="num" id="ciBhat">—</div></div>
+            <div class="stat"><p class="lab">Error estándar</p><div class="num" id="ciSe">—</div></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><p class="lab">Semiancho t·ee</p><div class="num" id="ciHalf" style="font-size:14px;">—</div></div>
+            <div class="stat truth"><p class="lab">Intervalo</p><div class="num" id="ciBounds" style="font-size:14px;">—</div></div>
+          </div>
+          <div class="callout">El ancho de esta Normal es el mismo error estándar que dispersa los β̂ de la
+            pestaña <b>04</b>. Aquí lo convertimos en un intervalo.</div>
+        </div>
+      </div>
+      <figure>
+        <div class="canvas-hold"><canvas id="ciCv" height="350"></canvas></div>
+        <figcaption>
+          <span class="lg"><span class="sw" style="background:var(--accent)"></span>Normal de β̂₁ (centro = β̂₁, ancho = ee)</span>
+          <span class="lg"><span class="sw" style="background:var(--accent-soft);border:1px solid var(--accent)"></span>área central = nivel</span>
+          <span class="lg"><span class="sw dash"></span>β₁ verdadero</span>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
   <footer>Simulación autocontenida · sin librerías externas · ICS 2563 2026-2</footer>
 </div>
 
@@ -338,8 +382,10 @@
     return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
   function mean(a){let s=0;for(const x of a)s+=x;return s/a.length;}
   function sd(a,m){m=m??mean(a);let s=0;for(const x of a)s+=(x-m)*(x-m);return Math.sqrt(s/(a.length-1));}
-  function tcrit(df){const z=1.959963985;
+  function tcritZ(df,z){
     return z + (z**3+z)/(4*df) + (5*z**5+16*z**3+3*z)/(96*df*df) + (3*z**7+19*z**5+17*z**3-15*z)/(384*df**3);}
+  function tcrit(df){return tcritZ(df,1.959963985);}
+  const Z_LVL={90:1.6448536,95:1.9599640,99:2.5758293};
   const normalPdf=(x,mu,s)=>Math.exp(-((x-mu)**2)/(2*s*s))/(s*Math.sqrt(2*Math.PI));
   function comb(n,k){let r=1;for(let i=0;i<k;i++)r=r*(n-i)/(i+1);return r;}
 
@@ -410,7 +456,7 @@
   // TABS
   // =================================================================
   const tabs=[...document.querySelectorAll('nav.tabs button')];
-  const panels={placa:$('placa'),pob:$('pob'),mue:$('mue'),reg:$('reg'),multi:$('multi')};
+  const panels={placa:$('placa'),pob:$('pob'),mue:$('mue'),reg:$('reg'),multi:$('multi'),ci:$('ci')};
   tabs.forEach(b=>b.addEventListener('click',()=>{
     tabs.forEach(t=>t.setAttribute('a-selected',t===b?'true':'false'));
     Object.values(panels).forEach(p=>p.classList.remove('active'));
@@ -643,7 +689,7 @@
     for(let i=0;i<n;i++){sxy+=(xs[i]-mx)*(ys[i]-my);sxx+=(xs[i]-mx)**2;}
     const b1=sxy/sxx,b0=my-b1*mx;let ssr=0;for(let i=0;i<n;i++)ssr+=(ys[i]-(b0+b1*xs[i]))**2;
     const se=Math.sqrt((ssr/(n-2))/sxx),tc=tcrit(n-2);
-    return {xs,ys,b0,b1,lo:b1-tc*se,hi:b1+tc*se,cov:(B1>=b1-tc*se&&B1<=b1+tc*se)};}
+    return {xs,ys,b0,b1,se,lo:b1-tc*se,hi:b1+tc*se,cov:(B1>=b1-tc*se&&B1<=b1+tc*se)};}
   function drawCouples(){
     const f=fit($('coupleStrip'));if(!f)return;const {ctx,w,h}=f;ctx.clearRect(0,0,w,h);
     if(!lastReg){ctx.fillStyle=css("--muted");ctx.font="13px "+css("--sans");ctx.textAlign="center";
@@ -781,6 +827,82 @@
     drawTrios();drawBetaHist($('betaPCv'),bps,"β̂ padre");drawBetaHist($('betaMCv'),bms,"β̂ madre");});
 
   // =================================================================
+  // 06 EL INTERVALO — Normal de β̂₁ y su intervalo de confianza
+  // =================================================================
+  let ciReg=null, ciLevel=95;
+  function drawCI(){
+    const f=fit($('ciCv'));if(!f)return;const {ctx,w,h}=f;ctx.clearRect(0,0,w,h);
+    if(!ciReg){ctx.fillStyle=css("--muted");ctx.font="13px "+css("--sans");ctx.textAlign="center";
+      ctx.fillText("Pulsa “Nueva muestra” para ver la Normal y su intervalo.",w/2,h/2);
+      $('ciFormula').innerHTML='IC = β̂₁ ± t · ee(β̂₁)';return;}
+    const b=ciReg.b1, se=ciReg.se, n=+$('cin').value;
+    const z=Z_LVL[ciLevel], t=tcritZ(n-2,z), half=t*se, lo=b-half, hi=b+half;
+    const padL=16,padR=16,padT=20,padB=58,W=w-padL-padR,H=h-padT-padB;
+    const xmin=Math.min(b-3.6*se,B1-1.2*se), xmax=Math.max(b+3.6*se,B1+1.2*se);
+    const X=v=>padL+((v-xmin)/(xmax-xmin))*W;
+    const peak=normalPdf(b,b,se), Y=dv=>padT+H-(dv/peak)*H*0.92, axisY=padT+H;
+    // shaded central area = IC
+    ctx.fillStyle=css("--accent-soft");ctx.beginPath();ctx.moveTo(X(lo),axisY);
+    for(let v=lo;v<=hi;v+=(hi-lo)/160)ctx.lineTo(X(v),Y(normalPdf(v,b,se)));
+    ctx.lineTo(X(hi),axisY);ctx.closePath();ctx.fill();
+    // curve
+    ctx.strokeStyle=css("--accent");ctx.lineWidth=2;ctx.beginPath();
+    for(let px=0;px<=W;px+=2){const v=xmin+(px/W)*(xmax-xmin);const y=Y(normalPdf(v,b,se));
+      px===0?ctx.moveTo(padL+px,y):ctx.lineTo(padL+px,y);}ctx.stroke();
+    // axis
+    ctx.strokeStyle=css("--line-strong");ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(padL,axisY+.5);ctx.lineTo(padL+W,axisY+.5);ctx.stroke();
+    ctx.fillStyle=css("--muted");ctx.font="11px "+css("--mono");ctx.textAlign="center";
+    for(let k=0;k<=4;k++){const v=xmin+(xmax-xmin)*k/4;ctx.fillText(fmt(v,2),X(v),axisY+16);}
+    // CI bound drop lines
+    [lo,hi].forEach(v=>{ctx.strokeStyle=css("--accent");ctx.lineWidth=1.5;ctx.setLineDash([3,3]);
+      ctx.beginPath();ctx.moveTo(X(v),Y(normalPdf(v,b,se)));ctx.lineTo(X(v),axisY);ctx.stroke();ctx.setLineDash([]);});
+    // tail % labels
+    const tailPct=fmt((100-ciLevel)/2,1);ctx.fillStyle=css("--muted");ctx.font="10px "+css("--mono");
+    ctx.textAlign="right";ctx.fillText(tailPct+"%",X(lo)-3,Y(normalPdf(lo,b,se))-3);
+    ctx.textAlign="left";ctx.fillText(tailPct+"%",X(hi)+3,Y(normalPdf(hi,b,se))-3);
+    // mean line
+    ctx.strokeStyle=css("--ink");ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(X(b),Y(peak));ctx.lineTo(X(b),axisY);ctx.stroke();
+    ctx.fillStyle=css("--ink");ctx.font="600 12px "+css("--sans");ctx.textAlign="center";
+    ctx.fillText("β̂₁ = "+fmt(b,3),X(b),Y(peak)-6);
+    // SE arrow b -> b+se
+    const ay=Y(peak)+(axisY-Y(peak))*0.5;
+    ctx.strokeStyle=css("--ink-2");ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(X(b),ay);ctx.lineTo(X(b+se),ay);
+    ctx.moveTo(X(b+se),ay);ctx.lineTo(X(b+se)-4,ay-3);ctx.moveTo(X(b+se),ay);ctx.lineTo(X(b+se)-4,ay+3);ctx.stroke();
+    ctx.fillStyle=css("--ink-2");ctx.font="italic 11px "+css("--sans");ctx.textAlign="center";
+    ctx.fillText("ee",(X(b)+X(b+se))/2,ay-4);
+    // truth marker
+    ctx.strokeStyle=css("--truth");ctx.lineWidth=2;ctx.setLineDash([5,4]);
+    ctx.beginPath();ctx.moveTo(X(B1),padT-6);ctx.lineTo(X(B1),axisY);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=css("--truth");ctx.font="600 11px "+css("--sans");
+    const rt=X(B1)>padL+W-64;ctx.textAlign=rt?"right":"left";
+    ctx.fillText("β₁ = 0,5",X(B1)+(rt?-4:4),padT+2);
+    // CI bracket under axis
+    const by=axisY+30;ctx.strokeStyle=css("--accent");ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(X(lo),by);ctx.lineTo(X(hi),by);
+    ctx.moveTo(X(lo),by-4);ctx.lineTo(X(lo),by+4);ctx.moveTo(X(hi),by-4);ctx.lineTo(X(hi),by+4);ctx.stroke();
+    ctx.fillStyle=css("--accent");ctx.font="600 11px "+css("--sans");ctx.textAlign="center";
+    ctx.fillText("IC "+ciLevel+"%: [ "+fmt(lo,3)+" , "+fmt(hi,3)+" ]",X(b),by+16);
+    // readouts
+    const cover=(B1>=lo&&B1<=hi);
+    $('ciFormula').innerHTML='IC<sub>'+ciLevel+'%</sub> = β̂₁ ± t<sub>(n−2)</sub> · ee = '+
+      '<b>'+fmt(b,3)+'</b> ± <b>'+fmt(t,3)+'</b>·<b>'+fmt(se,4)+'</b> = [ <b>'+fmt(lo,3)+'</b> , <b>'+fmt(hi,3)+'</b> ]'+
+      '<br><span style="color:var(--muted)">'+(cover?'β₁ = 0,5 está dentro del intervalo':'β₁ = 0,5 queda fuera del intervalo')+'</span>';
+    $('ciBhat').textContent=fmt(b,3);
+    $('ciSe').textContent=fmt(se,4);
+    $('ciHalf').innerHTML=fmt(t,3)+'·'+fmt(se,4)+' = '+fmt(half,3);
+    $('ciBounds').textContent='['+fmt(lo,2)+' ; '+fmt(hi,2)+']';
+  }
+  $('cin').addEventListener('input',()=>{$('cinVal').textContent=$('cin').value;
+    ciReg=regSample(+$('cin').value);drawCI();});
+  document.querySelectorAll('#ciLevelSeg button').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('#ciLevelSeg button').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));
+    ciLevel=+b.dataset.lvl;drawCI();}));
+  $('ciNew').addEventListener('click',()=>{ciReg=regSample(+$('cin').value);drawCI();});
+
+  // =================================================================
   // show / resize / theme
   // =================================================================
   function onShow(tab){requestAnimationFrame(()=>{
@@ -788,11 +910,12 @@
     else if(tab==='pob'){relayoutFigs();drawFigs();drawPopHist();}
     else if(tab==='mue'){drawUniverse();drawSampHist();}
     else if(tab==='reg'){drawCouples();drawScatter();drawBeta();drawDance();}
+    else if(tab==='ci')drawCI();
     else{drawTrios();drawBetaHist($('betaPCv'),bps,"β̂ padre");drawBetaHist($('betaMCv'),bms,"β̂ madre");}
   });}
   function redrawAll(){drawBoard();relayoutFigs();drawFigs();drawPopHist();drawUniverse();drawSampHist();
     drawCouples();drawScatter();drawBeta();drawDance();drawTrios();
-    drawBetaHist($('betaPCv'),bps,"β̂ padre");drawBetaHist($('betaMCv'),bms,"β̂ madre");}
+    drawBetaHist($('betaPCv'),bps,"β̂ padre");drawBetaHist($('betaMCv'),bms,"β̂ madre");drawCI();}
   let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(redrawAll,140);});
   new MutationObserver(redrawAll).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 
@@ -802,5 +925,6 @@
   buildUniverse();
   drawCouples();drawScatter();drawBeta();drawDance();
   drawTrios();drawBetaHist($('betaPCv'),bps,"β̂ padre");drawBetaHist($('betaMCv'),bms,"β̂ madre");
+  ciReg=regSample(40);drawCI();
 })();
 </script>
