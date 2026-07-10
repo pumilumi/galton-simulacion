@@ -1,0 +1,806 @@
+<title>Del tablero a la campana · Simulación ICS 2563</title>
+<style>
+  :root{
+    --bg:#f3f4f2; --surface:#fcfcfb; --surface-2:#f0f1ee; --ink:#1c1e24;
+    --ink-2:#4a4e5a; --muted:#7b8090; --line:#dcdee0; --line-strong:#c3c6cc;
+    --accent:#4457c6; --accent-soft:#e5e8fa; --truth:#c8860b; --miss:#c6473f;
+    --good:#3f7d54; --fig:#9aa0b0; --fig2:#6172d4;
+    --serif:Georgia,"Iowan Old Style","Times New Roman",serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --maxw:1140px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#141416; --surface:#1d1e22; --surface-2:#25272c; --ink:#eceef2;
+      --ink-2:#b8bcc6; --muted:#878c99; --line:#33353c; --line-strong:#44464e;
+      --accent:#6172d4; --accent-soft:#272a3f; --truth:#b98636; --miss:#d06a62;
+      --good:#5c9c72; --fig:#5b606e; --fig2:#8b98e6;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#f3f4f2; --surface:#fcfcfb; --surface-2:#f0f1ee; --ink:#1c1e24;
+    --ink-2:#4a4e5a; --muted:#7b8090; --line:#dcdee0; --line-strong:#c3c6cc;
+    --accent:#4457c6; --accent-soft:#e5e8fa; --truth:#c8860b; --miss:#c6473f; --good:#3f7d54;
+    --fig:#9aa0b0; --fig2:#6172d4;
+  }
+  :root[data-theme="dark"]{
+    --bg:#141416; --surface:#1d1e22; --surface-2:#25272c; --ink:#eceef2;
+    --ink-2:#b8bcc6; --muted:#878c99; --line:#33353c; --line-strong:#44464e;
+    --accent:#6172d4; --accent-soft:#272a3f; --truth:#b98636; --miss:#d06a62; --good:#5c9c72;
+    --fig:#5b606e; --fig2:#8b98e6;
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    line-height:1.55;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:clamp(18px,4vw,40px) clamp(16px,4vw,32px) 72px;}
+  header.masthead{border-bottom:1px solid var(--line);padding-bottom:22px;margin-bottom:6px;}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;}
+  h1{font-family:var(--serif);font-weight:600;font-size:clamp(28px,5vw,44px);line-height:1.08;letter-spacing:-.01em;margin:0 0 12px;text-wrap:balance;}
+  .lede{max-width:66ch;color:var(--ink-2);font-size:clamp(15px,1.6vw,17px);margin:0;}
+  .lede b{color:var(--ink);font-weight:600;}
+
+  nav.tabs{display:flex;flex-wrap:wrap;gap:4px;margin:24px 0 0;position:sticky;top:0;z-index:20;background:var(--bg);padding:10px 0;border-bottom:1px solid var(--line);}
+  nav.tabs button{font-family:var(--sans);font-size:14px;font-weight:550;color:var(--ink-2);background:transparent;border:1px solid transparent;border-radius:9px;padding:9px 14px;cursor:pointer;display:flex;align-items:baseline;gap:8px;transition:background .15s,color .15s;}
+  nav.tabs button .n{font-family:var(--mono);font-size:11px;color:var(--muted);}
+  nav.tabs button:hover{background:var(--surface-2);color:var(--ink);}
+  nav.tabs button[a-selected="true"]{background:var(--accent);color:#fff;}
+  nav.tabs button[a-selected="true"] .n{color:rgba(255,255,255,.7);}
+  nav.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+  .panel{display:none;padding-top:24px;}
+  .panel.active{display:block;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.panel.active{animation:none}}
+
+  .grid{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:26px;align-items:start;}
+  @media (max-width:800px){.grid{grid-template-columns:1fr;gap:20px;}}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;}
+  h2{font-family:var(--serif);font-weight:600;font-size:22px;letter-spacing:-.01em;margin:0 0 8px;text-wrap:balance;}
+  h3{font-size:12.5px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;}
+  p.note{color:var(--ink-2);font-size:14.5px;margin:0 0 14px;max-width:60ch;}
+  .k{font-family:var(--mono);font-size:.9em;color:var(--accent);background:var(--accent-soft);padding:1px 5px;border-radius:5px;}
+
+  label.ctl{display:block;font-size:13px;font-weight:600;color:var(--ink-2);margin:0 0 6px;}
+  label.ctl .val{float:right;font-family:var(--mono);color:var(--accent);font-weight:600;}
+  input[type=range]{width:100%;accent-color:var(--accent);margin:0 0 16px;height:22px;}
+  .seg{display:flex;border:1px solid var(--line-strong);border-radius:9px;overflow:hidden;margin-bottom:14px;}
+  .seg button{flex:1;font-family:var(--sans);font-size:13px;font-weight:550;color:var(--ink-2);background:var(--surface);border:0;border-right:1px solid var(--line);padding:8px 6px;cursor:pointer;}
+  .seg button:last-child{border-right:0;}
+  .seg button[aria-pressed="true"]{background:var(--accent);color:#fff;}
+  .btnrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+  button.act{font-family:var(--sans);font-size:14px;font-weight:600;color:#fff;background:var(--accent);border:0;border-radius:9px;padding:10px 14px;cursor:pointer;transition:filter .15s;}
+  button.act:hover{filter:brightness(1.07);}
+  button.act.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);}
+  button.act:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  button.act:disabled{opacity:.5;cursor:not-allowed;}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:16px;}
+  .stat{background:var(--surface);padding:12px 14px;}
+  .stat .lab{font-size:11px;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);margin:0 0 5px;}
+  .stat .num{font-family:var(--mono);font-size:19px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.01em;}
+  .stat .num small{font-size:12px;color:var(--muted);font-weight:500;}
+  .stat.hi .num{color:var(--accent);}
+  .stat.truth .num{color:var(--truth);}
+
+  figure{margin:0;}
+  .canvas-hold{position:relative;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 12px 6px;}
+  .canvas-hold + .canvas-hold{margin-top:12px;}
+  canvas{width:100%;display:block;}
+  figcaption{font-size:12.5px;color:var(--muted);margin:8px 0 0;display:flex;gap:16px;flex-wrap:wrap;align-items:center;}
+  .lg{display:inline-flex;align-items:center;gap:6px;}
+  .sw{width:13px;height:13px;border-radius:3px;flex:none;}
+  .sw.line{height:0;width:15px;border-top:2px solid var(--truth);border-radius:0;}
+  .sw.dash{height:0;width:15px;border-top:2px dashed var(--ink-2);border-radius:0;}
+
+  .eqbox{font-family:var(--mono);font-size:13px;line-height:1.5;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0 0 14px;color:var(--ink-2);min-height:78px;}
+  .eqbox b{color:var(--ink);}
+  .eqbox .big{font-size:15px;color:var(--accent);}
+  .callout{border-left:3px solid var(--truth);background:var(--surface-2);border-radius:0 10px 10px 0;padding:11px 15px;margin:14px 0 0;font-size:13.5px;color:var(--ink-2);}
+  .callout b{color:var(--ink);}
+  footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted);font-family:var(--mono);}
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow">ICS 2563 · Econometría Aplicada · Simulación de aula</p>
+    <h1>Del tablero de Galton a la campana</h1>
+    <p class="lede">Una distribución Normal no se supone: <b>aparece</b> cada vez que sumamos muchos
+      pequeños azares independientes. Fabricámosla con un tablero, la vemos surgir al muestrear estaturas
+      de personas reales, y la reencontramos en el intervalo de confianza de una regresión. Galton inventó
+      ambas cosas —el tablero y la regresión— estudiando estaturas de padres e hijos.</p>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="placa" a-selected="true"><span class="n">01</span>La placa</button>
+    <button role="tab" data-tab="pob"><span class="n">02</span>La población</button>
+    <button role="tab" data-tab="mue"><span class="n">03</span>El muestreo</button>
+    <button role="tab" data-tab="reg"><span class="n">04</span>La regresión</button>
+    <button role="tab" data-tab="multi"><span class="n">05</span>Dos variables</button>
+  </nav>
+
+  <!-- 01 PLACA -->
+  <section class="panel active" id="placa">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2>El tablero de Galton</h2>
+          <p class="note">Cada bolita rebota en cada clavo a izquierda o derecha con probabilidad ½.
+            Su casillero final es la <b>suma de muchos pasos ±1 independientes</b>. Usa
+            <b>Explicar</b> para seguir una bolita paso a paso y ver cómo se multiplican las
+            probabilidades.</p>
+          <div class="eqbox" id="eqBox">Pulsa <b>Explicar</b> para ver una bolita rebotar y cómo
+            (½)·(½)·… construye la probabilidad de su camino.</div>
+          <label class="ctl">Filas de clavos <span class="val" id="rowsVal">12</span>
+            <input type="range" id="rows" min="4" max="18" step="1" value="12"></label>
+          <div class="btnrow">
+            <button class="act" id="explain">Explicar (1 lenta)</button>
+            <button class="act ghost" id="drop1">Soltar 1</button>
+            <button class="act ghost" id="drop100">Soltar 100</button>
+            <button class="act ghost" id="resetPlaca">Reiniciar</button>
+          </div>
+          <div class="stats">
+            <div class="stat hi"><p class="lab">Bolitas</p><div class="num" id="pTotal">0</div></div>
+            <div class="stat truth"><p class="lab">Centro esperado</p><div class="num" id="pMean">—</div></div>
+          </div>
+          <div class="callout">El nº de caminos hacia cada casillero es el <b>triángulo de Pascal</b>
+            (la binomial). Con muchas filas, esa binomial se aproxima a la Normal (de Moivre–Laplace).</div>
+        </div>
+      </div>
+      <figure>
+        <div class="canvas-hold"><canvas id="boardCv" height="600"></canvas></div>
+        <figcaption>
+          <span class="lg"><span class="sw" style="background:var(--truth)"></span>bolita en caída</span>
+          <span class="lg"><span class="sw" style="background:var(--accent)"></span>acumuladas</span>
+          <span class="lg"><span class="sw line"></span>Normal teórica</span>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 02 POBLACION -->
+  <section class="panel" id="pob">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2>La población de estaturas</h2>
+          <p class="note">Un grupo de <b id="popNlab">70</b> personas, cada una con su estatura. Pulsa
+            <b>Ordenar por altura</b> y observa cómo, al alinearlas, su silueta ya dibuja la distribución
+            que aparece abajo.</p>
+          <h3>Forma de la población</h3>
+          <div class="seg" id="popShape">
+            <button data-shape="normal" aria-pressed="true">Normal</button>
+            <button data-shape="uniform">Uniforme</button>
+            <button data-shape="skew">Sesgada</button>
+            <button data-shape="bimodal">Bimodal</button>
+          </div>
+          <div class="btnrow">
+            <button class="act" id="sortFigs">Ordenar por altura</button>
+            <button class="act ghost" id="shuffleFigs">Barajar</button>
+          </div>
+          <div class="stats">
+            <div class="stat truth"><p class="lab">Media μ</p><div class="num" id="popMu">—</div></div>
+            <div class="stat"><p class="lab">Desv. σ</p><div class="num" id="popSd">—</div></div>
+          </div>
+        </div>
+      </div>
+      <figure>
+        <div class="canvas-hold"><canvas id="figCv" height="210"></canvas></div>
+        <div class="canvas-hold"><canvas id="popCv" height="300"></canvas></div>
+        <figcaption>
+          <span class="lg"><span class="sw" style="background:var(--fig)"></span>personas (altura)</span>
+          <span class="lg"><span class="sw" style="background:var(--accent)"></span>estaturas (cm)</span>
+          <span class="lg"><span class="sw line"></span>media μ</span>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 03 MUESTREO -->
+  <section class="panel" id="mue">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2>El muestreo</h2>
+          <p class="note">Arriba, el universo de <b>100 personas</b> ordenadas por altura. Extrae una
+            muestra de <b>n</b>: se pintan de color las elegidas y calculamos su media
+            <span class="k">x̄</span> y desviación <span class="k">s</span>. Al repetir mil veces, las
+            medias forman la <b>distribución muestral</b> (se angosta como <span class="k">σ/√n</span>).</p>
+          <label class="ctl">Tamaño de muestra n <span class="val" id="nVal">50</span>
+            <input type="range" id="nSize" min="5" max="100" step="5" value="50"></label>
+          <div class="btnrow">
+            <button class="act" id="one">Extraer muestra</button>
+            <button class="act ghost" id="thousand">Repetir 1.000</button>
+            <button class="act ghost" id="resetMue">Limpiar</button>
+          </div>
+          <div class="stats">
+            <div class="stat hi"><p class="lab">x̄ muestra</p><div class="num" id="sMean">—</div></div>
+            <div class="stat"><p class="lab">s muestra</p><div class="num" id="sSd">—</div></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><p class="lab">Muestras</p><div class="num" id="mCount">0</div></div>
+            <div class="stat"><p class="lab">SE empírico</p><div class="num" id="mSeEmp">—</div></div>
+            <div class="stat truth"><p class="lab">σ/√n</p><div class="num" id="mSeThe">—</div></div>
+          </div>
+        </div>
+      </div>
+      <figure>
+        <div class="canvas-hold"><canvas id="uniCv" height="215"></canvas></div>
+        <div class="canvas-hold"><canvas id="sampCv" height="290"></canvas></div>
+        <figcaption>
+          <span class="lg"><span class="sw" style="background:var(--fig)"></span>no seleccionada</span>
+          <span class="lg"><span class="sw" style="background:var(--accent)"></span>en la muestra</span>
+          <span class="lg"><span class="sw line"></span>μ</span>
+          <span class="lg"><span class="sw dash"></span>Normal(μ, σ/√n)</span>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 04 REGRESION -->
+  <section class="panel" id="reg">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2>La regresión y su intervalo</h2>
+          <p class="note">Modelo verdadero: <span class="k">hijo = 85 + 0,5·padre + ε</span>, con
+            <b>β₁ = 0,5</b> (la “regresión a la media” de Galton). Cada muestra son <b>n</b> parejas
+            padre–hijo (se pintan de color y se resaltan sus puntos). Ajustamos MCO y guardamos
+            <b>β̂₁</b> con su intervalo al 95%.</p>
+          <label class="ctl">Tamaño de muestra n <span class="val" id="rnVal">40</span>
+            <input type="range" id="rn" min="10" max="150" step="5" value="40"></label>
+          <div class="btnrow">
+            <button class="act" id="rOne">Una muestra</button>
+            <button class="act ghost" id="rThousand">Repetir 1.000</button>
+            <button class="act ghost" id="rReset">Limpiar</button>
+          </div>
+          <div class="stats">
+            <div class="stat hi"><p class="lab">β̂₁ (última)</p><div class="num" id="bHat">—</div></div>
+            <div class="stat"><p class="lab">IC 95%</p><div class="num" id="bCI" style="font-size:14px;">—</div></div>
+            <div class="stat truth"><p class="lab">Cobertura</p><div class="num" id="cov">—</div></div>
+          </div>
+          <div class="callout"><b>Cobertura:</b> de las 1.000 muestras, ¿qué fracción de intervalos
+            contiene al verdadero β₁ = 0,5? Debería rondar el 95%.</div>
+        </div>
+      </div>
+      <figure>
+        <div class="canvas-hold"><canvas id="coupleStrip" height="150"></canvas></div>
+        <div class="canvas-hold"><canvas id="scatterCv" height="300"></canvas></div>
+        <div class="canvas-hold"><canvas id="betaCv" height="210"></canvas></div>
+        <div class="canvas-hold"><canvas id="danceCv" height="220"></canvas></div>
+        <figcaption>
+          <span class="lg"><span class="sw" style="background:var(--accent)"></span>IC cubre β₁</span>
+          <span class="lg"><span class="sw" style="background:var(--miss)"></span>NO lo cubre</span>
+          <span class="lg"><span class="sw line"></span>β₁ / recta verdadera</span>
+          <span class="lg"><span class="sw dash"></span>recta MCO</span>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 05 MULTIVARIADA -->
+  <section class="panel" id="multi">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2>Dos variables: padre y madre</h2>
+          <p class="note">Ahora la estatura del hijo depende de <b>ambos</b> progenitores:
+            <span class="k">hijo = 67,2 + 0,3·padre + 0,3·madre + ε</span>. Cada muestra son <b>n</b> tríos
+            (padre, madre, hijo). MCO estima <b>dos</b> pendientes a la vez, cada una con su intervalo.</p>
+          <label class="ctl">Tamaño de muestra n <span class="val" id="mnVal">60</span>
+            <input type="range" id="mn" min="20" max="250" step="10" value="60"></label>
+          <div class="btnrow">
+            <button class="act" id="mOne">Una muestra</button>
+            <button class="act ghost" id="mThousand">Repetir 1.000</button>
+            <button class="act ghost" id="mReset">Limpiar</button>
+          </div>
+          <div class="stats">
+            <div class="stat hi"><p class="lab">β̂ padre</p><div class="num" id="bp">—</div></div>
+            <div class="stat hi"><p class="lab">β̂ madre</p><div class="num" id="bm">—</div></div>
+          </div>
+          <div class="stats">
+            <div class="stat truth"><p class="lab">Cobertura β padre</p><div class="num" id="covp">—</div></div>
+            <div class="stat truth"><p class="lab">Cobertura β madre</p><div class="num" id="covm">—</div></div>
+          </div>
+          <div class="callout"><b>β verdadero = 0,3</b> para cada progenitor. Ambos histogramas se centran
+            en 0,3 y ambas coberturas rondan el 95%: la inferencia funciona igual con más regresores.</div>
+        </div>
+      </div>
+      <figure>
+        <div class="canvas-hold"><canvas id="trioStrip" height="170"></canvas></div>
+        <div class="canvas-hold"><canvas id="betaPCv" height="210"></canvas></div>
+        <div class="canvas-hold"><canvas id="betaMCv" height="210"></canvas></div>
+        <figcaption>
+          <span class="lg"><span class="sw" style="background:var(--truth)"></span>padre</span>
+          <span class="lg"><span class="sw" style="background:var(--fig2)"></span>madre</span>
+          <span class="lg"><span class="sw" style="background:var(--accent)"></span>hijo</span>
+          <span class="lg"><span class="sw line"></span>β verdadero = 0,3</span>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <footer>Simulación autocontenida · sin librerías externas · ICS 2563 2026-2</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const REDUCED = matchMedia("(prefers-reduced-motion:reduce)").matches;
+  const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const fmt = (x,d=1)=> (isFinite(x)?x:0).toLocaleString("es-CL",{minimumFractionDigits:d,maximumFractionDigits:d});
+  const $ = id => document.getElementById(id);
+
+  // ---------- math ----------
+  function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();
+    return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+  function mean(a){let s=0;for(const x of a)s+=x;return s/a.length;}
+  function sd(a,m){m=m??mean(a);let s=0;for(const x of a)s+=(x-m)*(x-m);return Math.sqrt(s/(a.length-1));}
+  function tcrit(df){const z=1.959963985;
+    return z + (z**3+z)/(4*df) + (5*z**5+16*z**3+3*z)/(96*df*df) + (3*z**7+19*z**5+17*z**3-15*z)/(384*df**3);}
+  const normalPdf=(x,mu,s)=>Math.exp(-((x-mu)**2)/(2*s*s))/(s*Math.sqrt(2*Math.PI));
+  function comb(n,k){let r=1;for(let i=0;i<k;i++)r=r*(n-i)/(i+1);return r;}
+
+  // ---------- canvas ----------
+  function fit(cv){
+    const dpr=Math.min(devicePixelRatio||1,2);
+    const w=cv.clientWidth, h=parseInt(cv.getAttribute("height"));
+    if(w===0)return null;
+    cv.width=w*dpr; cv.height=h*dpr;
+    const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
+    return {ctx,w,h};
+  }
+  function histFromData(data,xmin,xmax,bins){
+    const c=new Array(bins).fill(0), bw=(xmax-xmin)/bins;
+    for(const x of data){let k=Math.floor((x-xmin)/bw);if(k<0)k=0;if(k>=bins)k=bins-1;c[k]++;}
+    return {c,bw};
+  }
+  function roundedBar(ctx,x,y,bw,bh){const r=Math.min(3,bw/2,bh);
+    ctx.beginPath();ctx.moveTo(x,y+bh);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);
+    ctx.lineTo(x+bw-r,y);ctx.arcTo(x+bw,y,x+bw,y+r,r);ctx.lineTo(x+bw,y+bh);ctx.closePath();ctx.fill();}
+  function drawHist(cv,counts,xmin,xmax,opts={}){
+    const f=fit(cv);if(!f)return;const {ctx,w,h}=f;ctx.clearRect(0,0,w,h);
+    const padL=40,padR=12,padT=14,padB=28, W=w-padL-padR, H=h-padT-padB;
+    const bins=counts.length, bw=W/bins;
+    const maxC=Math.max(1,...counts, opts.curveMax||0);
+    const yOf=c=>padT+H-(c/maxC)*H;
+    ctx.strokeStyle=css("--line-strong");ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(padL,padT+H+.5);ctx.lineTo(padL+W,padT+H+.5);ctx.stroke();
+    ctx.fillStyle=css("--accent");
+    for(let i=0;i<bins;i++){if(counts[i]<=0)continue;
+      const x=padL+i*bw, y=yOf(counts[i]);roundedBar(ctx,x,y,Math.max(1,bw-2),padT+H-y);}
+    ctx.fillStyle=css("--muted");ctx.font="11px "+css("--mono");ctx.textAlign="center";
+    for(let k=0;k<=4;k++){const tv=xmin+(xmax-xmin)*k/4;
+      ctx.fillText(opts.fmtX?opts.fmtX(tv):fmt(tv,0),padL+W*k/4,padT+H+18);}
+    if(opts.curve){ctx.strokeStyle=opts.curveColor||css("--ink-2");ctx.lineWidth=2;
+      ctx.setLineDash(opts.curveDash||[]);ctx.beginPath();
+      for(let px=0;px<=W;px+=2){const xv=xmin+(px/W)*(xmax-xmin);const py=yOf(opts.curve(xv));
+        px===0?ctx.moveTo(padL+px,py):ctx.lineTo(padL+px,py);}
+      ctx.stroke();ctx.setLineDash([]);}
+    (opts.markers||[]).forEach(mk=>{const px=padL+((mk.x-xmin)/(xmax-xmin))*W;
+      ctx.strokeStyle=mk.color||css("--truth");ctx.lineWidth=2;ctx.setLineDash(mk.dash||[]);
+      ctx.beginPath();ctx.moveTo(px,padT);ctx.lineTo(px,padT+H);ctx.stroke();ctx.setLineDash([]);
+      if(mk.label){ctx.fillStyle=mk.color||css("--truth");ctx.font="600 11px "+css("--sans");
+        const right=px>padL+W-46;ctx.textAlign=right?"right":"left";
+        ctx.fillText(mk.label,px+(right?-4:4),padT+10);}});
+    if(opts.title){ctx.fillStyle=css("--muted");ctx.font="600 11px "+css("--sans");ctx.textAlign="left";
+      ctx.fillText(opts.title,padL,10);}
+  }
+
+  // ---------- stick figure ----------
+  function hPX(cm,base,scale){return Math.max(12, base+(cm-150)*scale);}
+  function drawStick(ctx,cx,baseY,H,color,alpha){
+    ctx.save();ctx.globalAlpha=alpha==null?1:alpha;ctx.strokeStyle=color;ctx.fillStyle=color;
+    ctx.lineWidth=Math.max(1,H*0.045);ctx.lineCap="round";
+    const hr=H*0.12, hcy=baseY-H+hr;
+    ctx.beginPath();ctx.arc(cx,hcy,hr,0,7);ctx.fill();
+    const neck=hcy+hr, hip=baseY-H*0.40;
+    ctx.beginPath();ctx.moveTo(cx,neck);ctx.lineTo(cx,hip);ctx.stroke();
+    const sh=neck+H*0.05;
+    ctx.beginPath();ctx.moveTo(cx,sh);ctx.lineTo(cx-H*0.15,hip-H*0.04);
+    ctx.moveTo(cx,sh);ctx.lineTo(cx+H*0.15,hip-H*0.04);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx,hip);ctx.lineTo(cx-H*0.13,baseY);
+    ctx.moveTo(cx,hip);ctx.lineTo(cx+H*0.13,baseY);ctx.stroke();
+    ctx.restore();
+  }
+
+  // =================================================================
+  // TABS
+  // =================================================================
+  const tabs=[...document.querySelectorAll('nav.tabs button')];
+  const panels={placa:$('placa'),pob:$('pob'),mue:$('mue'),reg:$('reg'),multi:$('multi')};
+  tabs.forEach(b=>b.addEventListener('click',()=>{
+    tabs.forEach(t=>t.setAttribute('a-selected',t===b?'true':'false'));
+    Object.values(panels).forEach(p=>p.classList.remove('active'));
+    panels[b.dataset.tab].classList.add('active');onShow(b.dataset.tab);
+  }));
+
+  // =================================================================
+  // 01 PLACA — bouncing physics + probability walkthrough
+  // =================================================================
+  const boardCv=$('boardCv');
+  let bRows=12, bCounts=new Array(bRows+1).fill(0), bTotal=0;
+  let balls=[], boardLoop=null, spawnQueue=0, explainMode=false, explainState=null;
+  const rowsEl=$('rows'), rowsVal=$('rowsVal');
+
+  function boardGeom(w,h){
+    const bins=bRows+1, padX=20, top=26, pegBottom=h*0.55;
+    const colW=(w-2*padX)/(bRows+1);
+    const cx=w/2;
+    const histTop=pegBottom+22, histH=h-histTop-22;
+    return {bins,padX,top,pegBottom,colW,cx,histTop,histH};
+  }
+  function pegXY(g,rowsDone,rights){ // coord in half-steps
+    const coord=rights-rowsDone/2;
+    return {x:g.cx+coord*g.colW, y:g.top+(rowsDone/bRows)*(g.pegBottom-g.top)};
+  }
+  function makeBall(slow){
+    const rights=[]; let r=0;
+    const path=[]; // rowsDone from 0..bRows
+    let cum=0; const dirs=[];
+    for(let i=0;i<bRows;i++){const goR=Math.random()<0.5;dirs.push(goR);cum+=goR?1:0;}
+    const bin=cum;
+    return {dirs,bin,seg:0,prog:0,slow:!!slow,pause:0,rightsSoFar:0};
+  }
+  function drawBoard(){
+    const f=fit(boardCv);if(!f)return;const {ctx,w,h}=f;ctx.clearRect(0,0,w,h);
+    const g=boardGeom(w,h);
+    // pegs
+    ctx.fillStyle=css("--line-strong");
+    for(let r=0;r<bRows;r++){const npeg=r+1;
+      for(let i=0;i<npeg;i++){const p=pegXY(g,r, i);// pegs sit at half-steps: use coord i-r/2
+        const coord=i-r/2, x=g.cx+coord*g.colW, y=g.top+(r/bRows)*(g.pegBottom-g.top);
+        ctx.beginPath();ctx.arc(x,y,2.1,0,7);ctx.fill();}}
+    // histogram baseline
+    ctx.strokeStyle=css("--line");ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(g.padX,g.histTop+g.histH+.5);ctx.lineTo(w-g.padX,g.histTop+g.histH+.5);ctx.stroke();
+    const maxC=Math.max(1,...bCounts);
+    ctx.fillStyle=css("--accent");
+    for(let i=0;i<g.bins;i++){const bh=(bCounts[i]/maxC)*g.histH;if(bh<=0)continue;
+      const x=g.cx+(i-bRows/2)*g.colW - g.colW*0.44, y=g.histTop+g.histH-bh;
+      roundedBar(ctx,x,y,g.colW*0.88,bh);}
+    // normal overlay
+    if(bTotal>15){const mu=bRows/2, sg=Math.sqrt(bRows)/2;
+      ctx.strokeStyle=css("--truth");ctx.lineWidth=2;ctx.beginPath();let started=false;
+      for(let bx=-0.5;bx<=bRows+0.5;bx+=0.1){const frac=normalPdf(bx,mu,sg);const cval=bTotal*frac;
+        const x=g.cx+(bx-bRows/2)*g.colW, y=g.histTop+g.histH-(cval/maxC)*g.histH;
+        started?ctx.lineTo(x,y):(ctx.moveTo(x,y),started=true);}
+      ctx.stroke();}
+    // balls in flight
+    for(const b of balls){
+      const from=pegXY(g,b.seg,b.rightsSoFar);
+      const nextRights=b.rightsSoFar+(b.dirs[b.seg]?1:0);
+      const to=pegXY(g,b.seg+1,nextRights);
+      const t=b.prog;
+      const x=from.x+(to.x-from.x)*t;
+      const y=from.y+(to.y-from.y)*t - Math.sin(Math.PI*t)*6;
+      ctx.fillStyle=css("--truth");
+      ctx.beginPath();ctx.arc(x,y,b.slow?6:4,0,7);ctx.fill();
+      if(b.slow){ // trail of the path so far
+        ctx.strokeStyle=css("--truth");ctx.globalAlpha=.35;ctx.lineWidth=1.5;ctx.beginPath();
+        let rr=0;for(let s=0;s<=b.seg;s++){const p=pegXY(g,s,rr);s===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y);
+          rr+=b.dirs[s]?1:0;}
+        ctx.stroke();ctx.globalAlpha=1;}
+    }
+  }
+  function landBall(b){bCounts[b.bin]++;bTotal++;$('pTotal').textContent=bTotal.toLocaleString('es-CL');}
+  function stepBalls(){
+    for(let k=balls.length-1;k>=0;k--){const b=balls[k];
+      if(b.pause>0){b.pause--;continue;}
+      const speed=b.slow?0.035:0.14;
+      b.prog+=speed;
+      if(b.prog>=1){b.prog=0;b.rightsSoFar+=b.dirs[b.seg]?1:0;b.seg++;
+        if(b.slow){explainUpdate(b);b.pause=REDUCED?0:36;}
+        if(b.seg>=bRows){landBall(b);balls.splice(k,1);
+          if(b.slow){explainMode=false;explainFinish(b);}}
+      }
+    }
+    if(spawnQueue>0 && balls.length<60){balls.push(makeBall(false));spawnQueue--;}
+    drawBoard();
+    if(balls.length>0||spawnQueue>0){boardLoop=requestAnimationFrame(stepBalls);}
+    else{boardLoop=null;}
+  }
+  function ensureLoop(){if(!boardLoop)boardLoop=requestAnimationFrame(stepBalls);}
+  function explainUpdate(b){
+    const step=b.seg; // choques completados
+    const path=b.dirs.slice(0,step).map(d=>d?'D':'I').join('·');
+    const prob=Math.pow(0.5,step);
+    $('eqBox').innerHTML=`Choque <b>${step}</b> de ${bRows}. Camino: <b>${path}</b><br>`+
+      `P(este camino) = (½)<sup>${step}</sup> = <span class="big">${fmt(prob,step>6?5:4)}</span>`;
+  }
+  function explainFinish(b){
+    const c=comb(bRows,b.bin), tot=Math.pow(2,bRows), p=c/tot;
+    $('eqBox').innerHTML=`Cayó en el casillero <b>k=${b.bin}</b>. Un camino concreto vale (½)<sup>${bRows}</sup>, `+
+      `pero a ese casillero llegan <b>C(${bRows},${b.bin}) = ${c.toLocaleString('es-CL')}</b> caminos.<br>`+
+      `P(k=${b.bin}) = ${c.toLocaleString('es-CL')} / ${tot.toLocaleString('es-CL')} = `+
+      `<span class="big">${fmt(p,3)}</span> — eso es la <b>binomial</b>.`;
+  }
+  function boardReset(){bRows=+rowsEl.value;bCounts=new Array(bRows+1).fill(0);bTotal=0;balls=[];
+    spawnQueue=0;explainMode=false;if(boardLoop){cancelAnimationFrame(boardLoop);boardLoop=null;}
+    $('pTotal').textContent='0';$('pMean').textContent=fmt(bRows/2,1);
+    $('eqBox').innerHTML='Pulsa <b>Explicar</b> para ver una bolita rebotar y cómo (½)·(½)·… construye su probabilidad.';
+    drawBoard();}
+  rowsEl.addEventListener('input',()=>{rowsVal.textContent=rowsEl.value;boardReset();});
+  $('explain').addEventListener('click',()=>{if(explainMode)return;explainMode=true;
+    balls.push(makeBall(true));ensureLoop();});
+  $('drop1').addEventListener('click',()=>{balls.push(makeBall(false));ensureLoop();});
+  $('drop100').addEventListener('click',()=>{spawnQueue+=100;ensureLoop();});
+  $('resetPlaca').addEventListener('click',boardReset);
+
+  // =================================================================
+  // 02 POBLACION — stick figures + sort
+  // =================================================================
+  const POBN=70; let figs=[], figLoop=null, popMu2=0, popSd2=0;
+  function drawFromShape(shape){
+    if(shape==='normal')return 170+10*randn();
+    if(shape==='uniform')return 170+(Math.random()-0.5)*34.641;
+    if(shape==='skew')return 160+(-10*Math.log(Math.random()));
+    return (Math.random()<0.5?160:180)+5*randn();
+  }
+  let pobShape='normal', curOrder=null;
+  function buildFigs(shape){
+    pobShape=shape; figs=[];
+    for(let i=0;i<POBN;i++)figs.push({h:drawFromShape(shape),idx:i});
+    const hs=figs.map(f=>f.h);popMu2=mean(hs);popSd2=sd(hs,popMu2);
+    $('popMu').innerHTML=fmt(popMu2,1)+'<small> cm</small>';
+    $('popSd').innerHTML=fmt(popSd2,1)+'<small> cm</small>';
+    shuffleFigs(false);drawPopHist();
+  }
+  function layoutFigs(order){ // order: array of fig-array-indices in display order
+    curOrder=order;const f=fit($('figCv'));if(!f)return;const W=f.w;
+    const padX=14, step=(W-2*padX)/POBN;
+    order.forEach((figIndex,pos)=>{figs[figIndex].tx=padX+step*pos+step/2;});
+  }
+  function relayoutFigs(){if(curOrder)layoutFigs(curOrder);figs.forEach(fg=>{if(fg.x==null)fg.x=fg.tx;});}
+  function shuffleFigs(animate){const ord=figs.map((_,i)=>i);
+    for(let i=ord.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[ord[i],ord[j]]=[ord[j],ord[i]];}
+    layoutFigs(ord);if(animate)animateFigs();else{figs.forEach(fg=>fg.x=fg.tx);drawFigs();}}
+  function sortFigs(){const ord=figs.map((_,i)=>i).sort((a,b)=>figs[a].h-figs[b].h);
+    layoutFigs(ord);animateFigs();}
+  function animateFigs(){if(figLoop)cancelAnimationFrame(figLoop);
+    const tick=()=>{let moving=false;
+      for(const fg of figs){if(fg.x==null)fg.x=fg.tx;const d=fg.tx-fg.x;
+        if(Math.abs(d)>0.5){fg.x+=d*(REDUCED?1:0.18);moving=true;}else fg.x=fg.tx;}
+      drawFigs();if(moving)figLoop=requestAnimationFrame(tick);else figLoop=null;};
+    tick();}
+  function drawFigs(){
+    const f=fit($('figCv'));if(!f)return;const {ctx,w,h}=f;ctx.clearRect(0,0,w,h);
+    const baseY=h-14;ctx.strokeStyle=css("--line");ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(8,baseY+.5);ctx.lineTo(w-8,baseY+.5);ctx.stroke();
+    for(const fg of figs){const H=hPX(fg.h,26,2.2);const px=fg.x!=null?fg.x:fg.tx;
+      if(px==null)continue;drawStick(ctx,px,baseY,Math.min(H,h-20),css("--fig"),.95);}
+  }
+  function drawPopHist(){
+    const lo=140,hi=200;const {c}=histFromData(figs.map(f=>f.h),lo,hi,24);
+    drawHist($('popCv'),c,lo,hi,{fmtX:v=>fmt(v,0),markers:[{x:popMu2,label:'μ='+fmt(popMu2,0)}]});
+  }
+  document.querySelectorAll('#popShape button').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('#popShape button').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));
+    buildFigs(b.dataset.shape);}));
+  $('sortFigs').addEventListener('click',sortFigs);
+  $('shuffleFigs').addEventListener('click',()=>shuffleFigs(true));
+
+  // =================================================================
+  // 03 MUESTREO — universe of 100 figures + figure sampling
+  // =================================================================
+  const UNIN=100; let universe=[], uniOrder=[], sampled=new Set(), means=[];
+  function buildUniverse(){universe=[];for(let i=0;i<UNIN;i++)universe.push(170+10*randn());
+    uniOrder=universe.map((_,i)=>i).sort((a,b)=>universe[a]-universe[b]);
+    sampled=new Set();means=[];resetMueStats();drawUniverse();drawSampHist();}
+  function drawUniverse(){
+    const f=fit($('uniCv'));if(!f)return;const {ctx,w,h}=f;ctx.clearRect(0,0,w,h);
+    const baseY=h-14, padX=12, step=(w-2*padX)/UNIN;
+    ctx.strokeStyle=css("--line");ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(8,baseY+.5);ctx.lineTo(w-8,baseY+.5);ctx.stroke();
+    for(let pos=0;pos<UNIN;pos++){const i=uniOrder[pos];
+      const cx=padX+step*pos+step/2, on=sampled.has(i);
+      const H=Math.min(hPX(universe[i],22,1.55),h-18);
+      drawStick(ctx,cx,baseY,H,on?css("--accent"):css("--fig"),on?1:.5);}
+  }
+  function resetMueStats(){$('sMean').textContent='—';$('sSd').textContent='—';
+    $('mCount').textContent=means.length.toLocaleString('es-CL');
+    $('mSeEmp').textContent=means.length>1?fmt(sd(means),2):'—';
+    $('mSeThe').innerHTML=fmt(sd(universe)/Math.sqrt(+$('nSize').value),2);}
+  function takeSample(){const n=+$('nSize').value;sampled=new Set();
+    const idx=[...Array(UNIN).keys()];
+    for(let i=idx.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[idx[i],idx[j]]=[idx[j],idx[i]];}
+    for(let i=0;i<n;i++)sampled.add(idx[i]);
+    const vals=[...sampled].map(i=>universe[i]);const m=mean(vals);
+    $('sMean').innerHTML=fmt(m,1)+'<small> cm</small>';$('sSd').innerHTML=fmt(sd(vals,m),1)+'<small> cm</small>';
+    drawUniverse();return m;}
+  function drawSampHist(){
+    if(means.length===0){const f=fit($('sampCv'));if(!f)return;const{ctx,w,h}=f;ctx.clearRect(0,0,w,h);
+      ctx.fillStyle=css("--muted");ctx.font="13px "+css("--sans");ctx.textAlign="center";
+      ctx.fillText("Repite el muestreo para construir la distribución muestral.",w/2,h/2);return;}
+    const mu=mean(universe),se=sd(universe)/Math.sqrt(+$('nSize').value);
+    const lo=mu-4*se,hi=mu+4*se,bins=36;const {c,bw}=histFromData(means,lo,hi,bins);
+    const total=means.length;const curve=x=>total*normalPdf(x,mu,se)*bw;
+    let cmax=0;for(let i=0;i<bins;i++)cmax=Math.max(cmax,curve(lo+(i+.5)*bw));
+    drawHist($('sampCv'),c,lo,hi,{fmtX:v=>fmt(v,0),curve,curveDash:[5,4],curveMax:cmax,
+      markers:[{x:mu,label:'μ'}]});
+  }
+  $('nSize').addEventListener('input',()=>{$('nVal').textContent=$('nSize').value;
+    $('mSeThe').innerHTML=fmt(sd(universe)/Math.sqrt(+$('nSize').value),2);});
+  $('one').addEventListener('click',()=>{const m=takeSample();means.push(m);resetMueStats();drawSampHist();});
+  $('thousand').addEventListener('click',function(){const btn=this;btn.disabled=true;
+    const uh=universe,n=+$('nSize').value;let done=0;
+    const run=()=>{const batch=REDUCED?1000:60;
+      for(let i=0;i<batch&&done<1000;i++){let s=0;for(let j=0;j<n;j++)s+=uh[(Math.random()*UNIN)|0];means.push(s/n);done++;}
+      resetMueStats();drawSampHist();done<1000?requestAnimationFrame(run):btn.disabled=false;};run();});
+  $('resetMue').addEventListener('click',()=>{sampled=new Set();means=[];resetMueStats();drawUniverse();drawSampHist();});
+
+  // =================================================================
+  // 04 REGRESION — couple figures + scatter + coverage
+  // =================================================================
+  const B0=85,B1=0.5,PMU=170,PSD=7,ESD=6;
+  let bhats=[],cis=[],covered=0,lastReg=null,bgPts=[];
+  for(let i=0;i<260;i++){const p=PMU+PSD*randn();bgPts.push([p,B0+B1*p+ESD*randn()]);}
+  function regSample(n){const xs=[],ys=[];
+    for(let i=0;i<n;i++){const p=PMU+PSD*randn();xs.push(p);ys.push(B0+B1*p+ESD*randn());}
+    const mx=mean(xs),my=mean(ys);let sxy=0,sxx=0;
+    for(let i=0;i<n;i++){sxy+=(xs[i]-mx)*(ys[i]-my);sxx+=(xs[i]-mx)**2;}
+    const b1=sxy/sxx,b0=my-b1*mx;let ssr=0;for(let i=0;i<n;i++)ssr+=(ys[i]-(b0+b1*xs[i]))**2;
+    const se=Math.sqrt((ssr/(n-2))/sxx),tc=tcrit(n-2);
+    return {xs,ys,b0,b1,lo:b1-tc*se,hi:b1+tc*se,cov:(B1>=b1-tc*se&&B1<=b1+tc*se)};}
+  function drawCouples(){
+    const f=fit($('coupleStrip'));if(!f)return;const {ctx,w,h}=f;ctx.clearRect(0,0,w,h);
+    if(!lastReg){ctx.fillStyle=css("--muted");ctx.font="13px "+css("--sans");ctx.textAlign="center";
+      ctx.fillText("Extrae una muestra para ver las parejas padre–hijo elegidas.",w/2,h/2);return;}
+    const show=Math.min(lastReg.xs.length,14),baseY=h-12;
+    const step=(w-28)/show;ctx.strokeStyle=css("--line");ctx.beginPath();
+    ctx.moveTo(10,baseY+.5);ctx.lineTo(w-10,baseY+.5);ctx.stroke();
+    for(let i=0;i<show;i++){const gx=14+step*i+step/2;
+      drawStick(ctx,gx-step*0.22,baseY,Math.min(hPX(lastReg.xs[i],20,1.3),h-16),css("--truth"),1);
+      drawStick(ctx,gx+step*0.22,baseY,Math.min(hPX(lastReg.ys[i],20,1.3),h-16),css("--accent"),1);}
+    ctx.fillStyle=css("--muted");ctx.font="10px "+css("--mono");ctx.textAlign="left";
+    ctx.fillText("padre",12,12);ctx.fillStyle=css("--accent");ctx.fillText("· hijo",44,12);
+  }
+  function drawScatter(){
+    const f=fit($('scatterCv'));if(!f)return;const {ctx,w,h}=f;ctx.clearRect(0,0,w,h);
+    const padL=40,padR=14,padT=12,padB=28,W=w-padL-padR,H=h-padT-padB;
+    const xmin=150,xmax=190,ymin=150,ymax=190;
+    const X=x=>padL+((x-xmin)/(xmax-xmin))*W,Y=y=>padT+H-((y-ymin)/(ymax-ymin))*H;
+    ctx.strokeStyle=css("--line");ctx.strokeRect(padL,padT,W,H);
+    ctx.fillStyle=css("--muted");ctx.font="11px "+css("--mono");ctx.textAlign="center";
+    for(let k=0;k<=4;k++)ctx.fillText(fmt(xmin+(xmax-xmin)*k/4,0),padL+W*k/4,padT+H+16);
+    ctx.textAlign="right";for(let k=0;k<=4;k++)ctx.fillText(fmt(ymin+(ymax-ymin)*k/4,0),padL-6,Y(ymin+(ymax-ymin)*k/4)+3);
+    ctx.fillStyle=css("--muted");ctx.font="11px "+css("--sans");ctx.textAlign="center";
+    ctx.fillText("estatura padre (cm)",padL+W/2,h-2);
+    // faint population
+    ctx.fillStyle=css("--fig");ctx.globalAlpha=.35;
+    for(const p of bgPts){ctx.beginPath();ctx.arc(X(p[0]),Y(p[1]),1.8,0,7);ctx.fill();}
+    ctx.globalAlpha=1;
+    if(lastReg){ctx.fillStyle=css("--accent");
+      for(let i=0;i<lastReg.xs.length;i++){ctx.beginPath();ctx.arc(X(lastReg.xs[i]),Y(lastReg.ys[i]),2.8,0,7);ctx.fill();}
+      ctx.strokeStyle=css("--truth");ctx.lineWidth=2;ctx.beginPath();
+      ctx.moveTo(X(xmin),Y(B0+B1*xmin));ctx.lineTo(X(xmax),Y(B0+B1*xmax));ctx.stroke();
+      ctx.strokeStyle=css("--ink-2");ctx.lineWidth=2;ctx.setLineDash([5,4]);ctx.beginPath();
+      ctx.moveTo(X(xmin),Y(lastReg.b0+lastReg.b1*xmin));ctx.lineTo(X(xmax),Y(lastReg.b0+lastReg.b1*xmax));
+      ctx.stroke();ctx.setLineDash([]);}
+  }
+  function drawBeta(){
+    if(bhats.length===0){const f=fit($('betaCv'));if(!f)return;const{ctx,w,h}=f;ctx.clearRect(0,0,w,h);
+      ctx.fillStyle=css("--muted");ctx.font="13px "+css("--sans");ctx.textAlign="center";
+      ctx.fillText("Repite muchas muestras para la distribución de β̂₁.",w/2,h/2);return;}
+    const {c}=histFromData(bhats,0.2,0.8,44);
+    drawHist($('betaCv'),c,0.2,0.8,{fmtX:v=>fmt(v,2),title:"Distribución de β̂₁",
+      markers:[{x:B1,label:'β₁=0,5'}]});}
+  function drawDance(){
+    const f=fit($('danceCv'));if(!f)return;const {ctx,w,h}=f;ctx.clearRect(0,0,w,h);
+    const padL=10,padT=8,W=w-20,H=h-16,lo=0.1,hi=0.9;const X=v=>padL+((v-lo)/(hi-lo))*W;
+    ctx.strokeStyle=css("--truth");ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(X(B1),padT);ctx.lineTo(X(B1),padT+H);ctx.stroke();
+    const show=cis.slice(-Math.min(cis.length,42));if(show.length===0){ctx.fillStyle=css("--muted");
+      ctx.font="12px "+css("--sans");ctx.textAlign="center";ctx.fillText("Cada línea será el IC de una muestra.",w/2,h/2);return;}
+    const rowH=H/show.length;
+    show.forEach((ci,i)=>{const y=padT+i*rowH+rowH/2;
+      ctx.strokeStyle=ci.cov?css("--accent"):css("--miss");ctx.lineWidth=ci.cov?1.8:2.4;
+      ctx.beginPath();ctx.moveTo(X(ci.lo),y);ctx.lineTo(X(ci.hi),y);ctx.stroke();
+      if(!ci.cov){ctx.fillStyle=css("--miss");ctx.beginPath();ctx.arc(X((ci.lo+ci.hi)/2),y,2.4,0,7);ctx.fill();}});
+  }
+  function pushReg(r){bhats.push(r.b1);cis.push({lo:r.lo,hi:r.hi,cov:r.cov});if(r.cov)covered++;}
+  function updRegStats(){if(!lastReg)return;$('bHat').textContent=fmt(lastReg.b1,3);
+    $('bCI').textContent='['+fmt(lastReg.lo,2)+' ; '+fmt(lastReg.hi,2)+']';
+    if(cis.length)$('cov').innerHTML=fmt(100*covered/cis.length,1)+'<small> %</small>';}
+  $('rn').addEventListener('input',()=>$('rnVal').textContent=$('rn').value);
+  $('rOne').addEventListener('click',()=>{lastReg=regSample(+$('rn').value);pushReg(lastReg);
+    updRegStats();drawCouples();drawScatter();drawBeta();drawDance();});
+  $('rThousand').addEventListener('click',function(){const btn=this;btn.disabled=true;let done=0;
+    const run=()=>{const batch=REDUCED?1000:40;for(let i=0;i<batch&&done<1000;i++){lastReg=regSample(+$('rn').value);pushReg(lastReg);done++;}
+      updRegStats();if(done%160===0||done>=1000){drawCouples();drawScatter();}drawBeta();drawDance();
+      done<1000?requestAnimationFrame(run):btn.disabled=false;};run();});
+  $('rReset').addEventListener('click',()=>{bhats=[];cis=[];covered=0;lastReg=null;
+    $('bHat').textContent='—';$('bCI').textContent='—';$('cov').textContent='—';
+    drawCouples();drawScatter();drawBeta();drawDance();});
+
+  // =================================================================
+  // 05 MULTIVARIADA — hijo = b0 + bp*padre + bm*madre + e
+  // =================================================================
+  const M0=67.2,BP=0.3,BM=0.3,PADMU=174,PADSD=7,MADMU=162,MADSD=6,MESD=5;
+  let bps=[],bms=[],covP=0,covM=0,mCnt=0,lastMulti=null;
+  function inv3(A){
+    const a=A[0][0],b=A[0][1],c=A[0][2],d=A[1][0],e=A[1][1],f=A[1][2],g=A[2][0],h=A[2][1],i=A[2][2];
+    const A00=e*i-f*h,A01=-(d*i-f*g),A02=d*h-e*g;
+    const det=a*A00+b*A01+c*A02;if(Math.abs(det)<1e-9)return null;
+    const A10=-(b*i-c*h),A11=a*i-c*g,A12=-(a*h-b*g);
+    const A20=b*f-c*e,A21=-(a*f-c*d),A22=a*e-b*d;
+    return [[A00/det,A10/det,A20/det],[A01/det,A11/det,A21/det],[A02/det,A12/det,A22/det]];
+  }
+  function multiSample(n){
+    const pad=[],mad=[],hij=[];
+    for(let i=0;i<n;i++){const p=PADMU+PADSD*randn(),m=MADMU+MADSD*randn();
+      pad.push(p);mad.push(m);hij.push(M0+BP*p+BM*m+MESD*randn());}
+    // X'X (3x3): [n, Σp, Σm; Σp, Σp², Σpm; Σm, Σpm, Σm²]
+    let Sp=0,Sm=0,Spp=0,Smm=0,Spm=0,Sy=0,Spy=0,Smy=0;
+    for(let i=0;i<n;i++){const p=pad[i],m=mad[i],y=hij[i];
+      Sp+=p;Sm+=m;Spp+=p*p;Smm+=m*m;Spm+=p*m;Sy+=y;Spy+=p*y;Smy+=m*y;}
+    const XtX=[[n,Sp,Sm],[Sp,Spp,Spm],[Sm,Spm,Smm]],Xty=[Sy,Spy,Smy];
+    const inv=inv3(XtX);if(!inv)return null;
+    const beta=[0,0,0];for(let r=0;r<3;r++)beta[r]=inv[r][0]*Xty[0]+inv[r][1]*Xty[1]+inv[r][2]*Xty[2];
+    let ssr=0;for(let i=0;i<n;i++){const yh=beta[0]+beta[1]*pad[i]+beta[2]*mad[i];ssr+=(hij[i]-yh)**2;}
+    const s2=ssr/(n-3),tc=tcrit(n-3);
+    const seP=Math.sqrt(s2*inv[1][1]),seM=Math.sqrt(s2*inv[2][2]);
+    return {pad,mad,hij,bp:beta[1],bm:beta[2],
+      pLo:beta[1]-tc*seP,pHi:beta[1]+tc*seP,mLo:beta[2]-tc*seM,mHi:beta[2]+tc*seM,
+      pCov:(BP>=beta[1]-tc*seP&&BP<=beta[1]+tc*seP),mCov:(BM>=beta[2]-tc*seM&&BM<=beta[2]+tc*seM)};
+  }
+  function drawTrios(){
+    const f=fit($('trioStrip'));if(!f)return;const {ctx,w,h}=f;ctx.clearRect(0,0,w,h);
+    if(!lastMulti){ctx.fillStyle=css("--muted");ctx.font="13px "+css("--sans");ctx.textAlign="center";
+      ctx.fillText("Extrae una muestra para ver los tríos padre–madre–hijo.",w/2,h/2);return;}
+    const show=Math.min(lastMulti.pad.length,9),baseY=h-12,step=(w-24)/show;
+    ctx.strokeStyle=css("--line");ctx.beginPath();ctx.moveTo(10,baseY+.5);ctx.lineTo(w-10,baseY+.5);ctx.stroke();
+    for(let i=0;i<show;i++){const gx=12+step*i+step/2,sp=step*0.24;
+      drawStick(ctx,gx-sp,baseY,Math.min(hPX(lastMulti.pad[i],20,1.2),h-16),css("--truth"),1);
+      drawStick(ctx,gx,baseY,Math.min(hPX(lastMulti.mad[i],20,1.2),h-16),css("--fig2"),1);
+      drawStick(ctx,gx+sp,baseY,Math.min(hPX(lastMulti.hij[i],20,1.2),h-16),css("--accent"),1);}
+  }
+  function drawBetaHist(cv,arr,label){
+    if(arr.length===0){const f=fit(cv);if(!f)return;const{ctx,w,h}=f;ctx.clearRect(0,0,w,h);
+      ctx.fillStyle=css("--muted");ctx.font="12px "+css("--sans");ctx.textAlign="center";
+      ctx.fillText("Repite muestras para ver "+label+".",w/2,h/2);return;}
+    const {c}=histFromData(arr,0.0,0.6,40);
+    drawHist(cv,c,0.0,0.6,{fmtX:v=>fmt(v,2),title:label,markers:[{x:0.3,label:'0,3'}]});}
+  function updMulti(){if(!lastMulti)return;
+    $('bp').innerHTML=fmt(lastMulti.bp,3)+'<small> ['+fmt(lastMulti.pLo,2)+';'+fmt(lastMulti.pHi,2)+']</small>';
+    $('bm').innerHTML=fmt(lastMulti.bm,3)+'<small> ['+fmt(lastMulti.mLo,2)+';'+fmt(lastMulti.mHi,2)+']</small>';
+    if(mCnt){$('covp').innerHTML=fmt(100*covP/mCnt,1)+'<small> %</small>';
+      $('covm').innerHTML=fmt(100*covM/mCnt,1)+'<small> %</small>';}}
+  function pushMulti(r){bps.push(r.bp);bms.push(r.bm);mCnt++;if(r.pCov)covP++;if(r.mCov)covM++;}
+  $('mn').addEventListener('input',()=>$('mnVal').textContent=$('mn').value);
+  $('mOne').addEventListener('click',()=>{const r=multiSample(+$('mn').value);if(!r)return;lastMulti=r;pushMulti(r);
+    updMulti();drawTrios();drawBetaHist($('betaPCv'),bps,"β̂ padre");drawBetaHist($('betaMCv'),bms,"β̂ madre");});
+  $('mThousand').addEventListener('click',function(){const btn=this;btn.disabled=true;let done=0;
+    const run=()=>{const batch=REDUCED?1000:40;for(let i=0;i<batch&&done<1000;i++){const r=multiSample(+$('mn').value);if(r){lastMulti=r;pushMulti(r);}done++;}
+      updMulti();if(done%160===0||done>=1000)drawTrios();
+      drawBetaHist($('betaPCv'),bps,"β̂ padre");drawBetaHist($('betaMCv'),bms,"β̂ madre");
+      done<1000?requestAnimationFrame(run):btn.disabled=false;};run();});
+  $('mReset').addEventListener('click',()=>{bps=[];bms=[];covP=covM=mCnt=0;lastMulti=null;
+    $('bp').textContent='—';$('bm').textContent='—';$('covp').textContent='—';$('covm').textContent='—';
+    drawTrios();drawBetaHist($('betaPCv'),bps,"β̂ padre");drawBetaHist($('betaMCv'),bms,"β̂ madre");});
+
+  // =================================================================
+  // show / resize / theme
+  // =================================================================
+  function onShow(tab){requestAnimationFrame(()=>{
+    if(tab==='placa')drawBoard();
+    else if(tab==='pob'){relayoutFigs();drawFigs();drawPopHist();}
+    else if(tab==='mue'){drawUniverse();drawSampHist();}
+    else if(tab==='reg'){drawCouples();drawScatter();drawBeta();drawDance();}
+    else{drawTrios();drawBetaHist($('betaPCv'),bps,"β̂ padre");drawBetaHist($('betaMCv'),bms,"β̂ madre");}
+  });}
+  function redrawAll(){drawBoard();relayoutFigs();drawFigs();drawPopHist();drawUniverse();drawSampHist();
+    drawCouples();drawScatter();drawBeta();drawDance();drawTrios();
+    drawBetaHist($('betaPCv'),bps,"β̂ padre");drawBetaHist($('betaMCv'),bms,"β̂ madre");}
+  let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(redrawAll,140);});
+  new MutationObserver(redrawAll).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+  // init
+  boardReset();
+  buildFigs('normal');
+  buildUniverse();
+  drawCouples();drawScatter();drawBeta();drawDance();
+  drawTrios();drawBetaHist($('betaPCv'),bps,"β̂ padre");drawBetaHist($('betaMCv'),bms,"β̂ madre");
+})();
+</script>
