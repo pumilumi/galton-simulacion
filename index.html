@@ -837,14 +837,16 @@
       $('ciFormula').innerHTML='IC = β̂₁ ± t · ee(β̂₁)';return;}
     const b=ciReg.b1, se=ciReg.se, n=+$('cin').value;
     const z=Z_LVL[ciLevel], t=tcritZ(n-2,z), half=t*se, lo=b-half, hi=b+half;
-    const padL=16,padR=16,padT=20,padB=58,W=w-padL-padR,H=h-padT-padB;
-    const xmin=Math.min(b-3.6*se,B1-1.2*se), xmax=Math.max(b+3.6*se,B1+1.2*se);
-    const X=v=>padL+((v-xmin)/(xmax-xmin))*W;
-    const peak=normalPdf(b,b,se), Y=dv=>padT+H-(dv/peak)*H*0.92, axisY=padT+H;
+    const padL=16,padR=16,padT=22,padB=58,W=w-padL-padR,H=h-padT-padB;
+    // Eje X FIJO y escala de altura FIJA: así, al subir n, la campana se estrecha y sube.
+    const xmin=-0.5, xmax=1.5, PDFMAX=7;
+    const clamp=v=>Math.max(xmin,Math.min(xmax,v));
+    const X=v=>padL+((v-xmin)/(xmax-xmin))*W, Xc=v=>X(clamp(v));
+    const peak=normalPdf(b,b,se), Y=dv=>padT+H-Math.min(dv,PDFMAX)/PDFMAX*H, axisY=padT+H;
     // shaded central area = IC
-    ctx.fillStyle=css("--accent-soft");ctx.beginPath();ctx.moveTo(X(lo),axisY);
-    for(let v=lo;v<=hi;v+=(hi-lo)/160)ctx.lineTo(X(v),Y(normalPdf(v,b,se)));
-    ctx.lineTo(X(hi),axisY);ctx.closePath();ctx.fill();
+    ctx.fillStyle=css("--accent-soft");ctx.beginPath();ctx.moveTo(Xc(lo),axisY);
+    for(let v=lo;v<=hi;v+=(hi-lo)/200)ctx.lineTo(Xc(v),Y(normalPdf(v,b,se)));
+    ctx.lineTo(Xc(hi),axisY);ctx.closePath();ctx.fill();
     // curve
     ctx.strokeStyle=css("--accent");ctx.lineWidth=2;ctx.beginPath();
     for(let px=0;px<=W;px+=2){const v=xmin+(px/W)*(xmax-xmin);const y=Y(normalPdf(v,b,se));
@@ -854,25 +856,28 @@
     ctx.beginPath();ctx.moveTo(padL,axisY+.5);ctx.lineTo(padL+W,axisY+.5);ctx.stroke();
     ctx.fillStyle=css("--muted");ctx.font="11px "+css("--mono");ctx.textAlign="center";
     for(let k=0;k<=4;k++){const v=xmin+(xmax-xmin)*k/4;ctx.fillText(fmt(v,2),X(v),axisY+16);}
+    // n label (top-left)
+    ctx.fillStyle=css("--muted");ctx.font="600 11px "+css("--sans");ctx.textAlign="left";
+    ctx.fillText("n = "+n,padL,padT-8);
     // CI bound drop lines
     [lo,hi].forEach(v=>{ctx.strokeStyle=css("--accent");ctx.lineWidth=1.5;ctx.setLineDash([3,3]);
-      ctx.beginPath();ctx.moveTo(X(v),Y(normalPdf(v,b,se)));ctx.lineTo(X(v),axisY);ctx.stroke();ctx.setLineDash([]);});
+      ctx.beginPath();ctx.moveTo(Xc(v),Y(normalPdf(v,b,se)));ctx.lineTo(Xc(v),axisY);ctx.stroke();ctx.setLineDash([]);});
     // tail % labels
     const tailPct=fmt((100-ciLevel)/2,1);ctx.fillStyle=css("--muted");ctx.font="10px "+css("--mono");
-    ctx.textAlign="right";ctx.fillText(tailPct+"%",X(lo)-3,Y(normalPdf(lo,b,se))-3);
-    ctx.textAlign="left";ctx.fillText(tailPct+"%",X(hi)+3,Y(normalPdf(hi,b,se))-3);
+    ctx.textAlign="right";ctx.fillText(tailPct+"%",Xc(lo)-3,Math.max(padT+8,Y(normalPdf(lo,b,se))-3));
+    ctx.textAlign="left";ctx.fillText(tailPct+"%",Xc(hi)+3,Math.max(padT+8,Y(normalPdf(hi,b,se))-3));
     // mean line
     ctx.strokeStyle=css("--ink");ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.moveTo(X(b),Y(peak));ctx.lineTo(X(b),axisY);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(Xc(b),Y(peak));ctx.lineTo(Xc(b),axisY);ctx.stroke();
     ctx.fillStyle=css("--ink");ctx.font="600 12px "+css("--sans");ctx.textAlign="center";
-    ctx.fillText("β̂₁ = "+fmt(b,3),X(b),Y(peak)-6);
+    ctx.fillText("β̂₁ = "+fmt(b,3),Xc(b),Y(peak)-6);
     // SE arrow b -> b+se
     const ay=Y(peak)+(axisY-Y(peak))*0.5;
     ctx.strokeStyle=css("--ink-2");ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.moveTo(X(b),ay);ctx.lineTo(X(b+se),ay);
-    ctx.moveTo(X(b+se),ay);ctx.lineTo(X(b+se)-4,ay-3);ctx.moveTo(X(b+se),ay);ctx.lineTo(X(b+se)-4,ay+3);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(Xc(b),ay);ctx.lineTo(Xc(b+se),ay);
+    ctx.moveTo(Xc(b+se),ay);ctx.lineTo(Xc(b+se)-4,ay-3);ctx.moveTo(Xc(b+se),ay);ctx.lineTo(Xc(b+se)-4,ay+3);ctx.stroke();
     ctx.fillStyle=css("--ink-2");ctx.font="italic 11px "+css("--sans");ctx.textAlign="center";
-    ctx.fillText("ee",(X(b)+X(b+se))/2,ay-4);
+    ctx.fillText("ee",(Xc(b)+Xc(b+se))/2,ay-4);
     // truth marker
     ctx.strokeStyle=css("--truth");ctx.lineWidth=2;ctx.setLineDash([5,4]);
     ctx.beginPath();ctx.moveTo(X(B1),padT-6);ctx.lineTo(X(B1),axisY);ctx.stroke();ctx.setLineDash([]);
@@ -881,10 +886,10 @@
     ctx.fillText("β₁ = 0,5",X(B1)+(rt?-4:4),padT+2);
     // CI bracket under axis
     const by=axisY+30;ctx.strokeStyle=css("--accent");ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(X(lo),by);ctx.lineTo(X(hi),by);
-    ctx.moveTo(X(lo),by-4);ctx.lineTo(X(lo),by+4);ctx.moveTo(X(hi),by-4);ctx.lineTo(X(hi),by+4);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(Xc(lo),by);ctx.lineTo(Xc(hi),by);
+    ctx.moveTo(Xc(lo),by-4);ctx.lineTo(Xc(lo),by+4);ctx.moveTo(Xc(hi),by-4);ctx.lineTo(Xc(hi),by+4);ctx.stroke();
     ctx.fillStyle=css("--accent");ctx.font="600 11px "+css("--sans");ctx.textAlign="center";
-    ctx.fillText("IC "+ciLevel+"%: [ "+fmt(lo,3)+" , "+fmt(hi,3)+" ]",X(b),by+16);
+    ctx.fillText("IC "+ciLevel+"%: [ "+fmt(lo,3)+" , "+fmt(hi,3)+" ]",Xc(b),by+16);
     // readouts
     const cover=(B1>=lo&&B1<=hi);
     $('ciFormula').innerHTML='IC<sub>'+ciLevel+'%</sub> = β̂₁ ± t<sub>(n−2)</sub> · ee = '+
