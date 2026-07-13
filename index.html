@@ -392,7 +392,11 @@
   // ---------- canvas ----------
   function fit(cv){
     const dpr=Math.min(devicePixelRatio||1,2);
-    const h=parseInt(cv.getAttribute("height"));
+    // La altura de diseño se guarda UNA sola vez en data-h. Ojo: fijar cv.height
+    // refleja al atributo "height", así que no se puede releer desde ahí (en pantallas
+    // retina dpr=2 se duplicaría en cada frame). Por eso usamos data-h, que nunca se pisa.
+    if(cv.dataset.h===undefined)cv.dataset.h=parseInt(cv.getAttribute("height"));
+    const h=+cv.dataset.h;
     cv.style.height=h+"px";           // pin display height: nunca seguir la razón intrínseca
     const w=cv.clientWidth;
     if(w===0)return null;
@@ -929,7 +933,7 @@
   // init
   // Fijar la altura CSS de cada canvas desde su atributo height, para que ninguno
   // se estire siguiendo la razón intrínseca antes de que fit() lo redimensione.
-  document.querySelectorAll('canvas').forEach(cv=>cv.style.height=parseInt(cv.getAttribute('height'))+'px');
+  document.querySelectorAll('canvas').forEach(cv=>{cv.dataset.h=parseInt(cv.getAttribute('height'));cv.style.height=cv.dataset.h+'px';});
   boardReset();
   buildFigs('normal');
   buildUniverse();
